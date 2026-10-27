@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>The Polite Student: School Quest 3D</title>
+    <!-- Tailwind CSS for UI components -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0f172a;
+        }
+        #game-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        /* UI Overlay */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 15px;
+            box-sizing: border-box;
+            z-index: 10;
+        }
+        .hud-panel {
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(8px);
+            border-radius: 12px;
+            padding: 12px 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            pointer-events: auto;
+            max-width: 400px;
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+        .hud-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #4A5568;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .hud-value {
+            font-size: 16px;
+            font-weight: 700;
+            color: #2B6CB0;
+            margin-top: 2px;
+        }
+        /* Interaction Prompt */
+        #interact-prompt {
+            position: absolute;
+            top: 60%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(43, 108, 176, 0.95);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-weight: bold;
+            font-size: 15px;
+            display: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+            pointer-events: auto;
+            z-index: 20;
+            animation: bounce 1.5s infinite;
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translate(-50%, -50%); }
+            50% { transform: translate(-50%, -60%); }
+        }
+        /* Touch Controls Layer */
+        #controls-layer {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            pointer-events: none;
+            z-index: 15;
+        }
+        #joystick-zone {
+            width: 120px;
+            height: 120px;
+            background: rgba(255, 255, 255, 0.25);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            position: relative;
+            pointer-events: auto;
+            touch-action: none;
+            backdrop-filter: blur(4px);
+        }
+        #joystick-knob {
+            width: 50px;
+            height: 50px;
+            background: #2B6CB0;
+            border-radius: 50%;
+            position: absolute;
+            top: 35px;
+            left: 35px;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+            pointer-events: none;
+        }
+        #mobile-interact-btn {
+            width: 80px;
+            height: 80px;
+            background: #38A169;
+            color: white;
+            border-radius: 50%;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            pointer-events: auto;
+            border: 3px solid white;
+            text-transform: uppercase;
+        }
+        #camera-touch-zone {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 50%;
+            height: 70%;
+            pointer-events: auto;
+            touch-action: none;
+            z-index: 5;
+        }
+        /* Modal Window Styles */
+        .modal {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(6px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            pointer-events: auto;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            width: 90%;
+            max-width: 520px;
+            box-shadow: 0 20px 30px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        .npc-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-bottom: 2px solid #EDF2F7;
+            padding-bottom: 10px;
+        }
+        .npc-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: #EBF8FF;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            border: 2px solid #3182CE;
+        }
+        .npc-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2D3748;
+        }
+        .scenario-box {
+            background: #EBF8FF;
+            border-left: 4px solid #3182CE;
+            padding: 12px 14px;
+            border-radius: 6px;
+            color: #2B6CB0;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        .answer-box {
+            min-height: 56px;
+            background: #F7FAFC;
+            border: 2px dashed #CBD5E0;
+            border-radius: 10px;
+            padding: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+        .word-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 4px;
+        }
+        .word-btn {
+            background: #EDF2F7;
+            border: 1px solid #CBD5E0;
+            border-radius: 8px;
+            padding: 8px 14px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #2D3748;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .word-btn:hover {
+            background: #E2E8F0;
+            transform: translateY(-1px);
+        }
+        .word-btn.selected {
+            opacity: 0.35;
+            pointer-events: none;
+            background: #CBD5E0;
+        }
+        .modal-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-top: 8px;
+        }
+        .btn {
+            padding: 10px 16px;
+            border-radius: 8px;
+            border: none;
+            font-weight: bold;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-primary { background: #3182CE; color: white; }
+        .btn-primary:hover { background: #2B6CB0; }
+        .btn-secondary { background: #E2E8F0; color: #4A5568; }
+        .btn-secondary:hover { background: #CBD5E0; }
+        .btn-warning { background: #ECC94B; color: #744210; }
+        .btn-warning:hover { background: #D69E2E; }
+
+        #feedback-msg {
+            font-weight: bold;
+            font-size: 13px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            display: none;
+        }
+        .feedback-success { background: #DEF7EC; color: #03543F; }
+        .feedback-error { background: #FDE8E8; color: #9B1C1C; }
+        .feedback-hint { background: #FEF08A; color: #713F12; }
+    </style>
+</head>
+<body>
+
+    <div id="game-container"></div>
+    <div id="camera-touch-zone"></div>
+
+    <!-- UI Overlay HUD -->
+    <div id="ui-layer" style="display: none;">
+        <div class="hud-panel">
+            <div class="hud-title" id="player-display-name">Player: -</div>
+            <div class="hud-value" id="objective-text">Find Teacher Sarah in Classroom 1</div>
+            <div style="margin-top: 6px; font-size: 12px; color: #718096; font-weight: 600;" id="progress-text">
+                Progress: 0 / 5 Characters Completed
+            </div>
+        </div>
+    </div>
+
+    <div id="interact-prompt">Press E or Tap to Interact</div>
+
+    <!-- Mobile Controls Layer -->
+    <div id="controls-layer">
+        <div id="joystick-zone">
+            <div id="joystick-knob"></div>
+        </div>
+        <div id="mobile-interact-btn">Interact</div>
+    </div>
+
+    <!-- Welcome / Name Entry Modal -->
+    <div class="modal" id="start-modal">
+        <div class="modal-content text-center items-center">
+            <div class="text-5xl mb-1">🏫</div>
+            <h1 class="text-2xl font-bold text-slate-800">The Polite Student</h1>
+            <p class="text-slate-500 text-sm mb-2">3D School Manner Quest</p>
+            
+            <div class="w-full text-left mt-2">
+                <label for="player-name-input" class="block text-xs font-bold text-slate-600 uppercase mb-1">Enter Your Name to Begin:</label>
+                <input type="text" id="player-name-input" placeholder="e.g. Alex" maxlength="20"
+                    class="w-full px-4 py-3 border-2 border-slate-300 rounded-xl font-bold text-slate-800 focus:outline-none focus:border-blue-500 text-center text-lg shadow-inner" />
+            </div>
+
+            <div id="start-error" class="text-xs text-red-500 font-bold hidden">Please enter your name to start the game!</div>
+
+            <button class="btn btn-primary w-full py-3 text-base shadow-lg hover:shadow-xl transition-all mt-2" id="play-btn">
+                🎮 Play Game
+            </button>
+        </div>
+    </div>
+
+    <!-- Sentence Building Challenge Modal -->
+    <div class="modal" id="dialog-modal" style="display: none;">
+        <div class="modal-content">
+            <div class="npc-header">
+                <div class="npc-avatar" id="npc-avatar">👩‍🏫</div>
+                <div>
+                    <div class="npc-title" id="npc-name">Teacher Sarah</div>
+                    <div style="font-size: 12px; color: #718096; font-weight: 600;" id="npc-role">Class Teacher</div>
+                </div>
+            </div>
+            
+            <div class="scenario-box" id="scenario-text">
+                You meet your class teacher inside Classroom 1 in the morning.
+            </div>
+
+            <div style="font-size: 13px; font-weight: bold; color: #4A5568;">Your Response:</div>
+            <div class="answer-box" id="answer-box"></div>
+
+            <div style="font-size: 13px; font-weight: bold; color: #4A5568;">Tap words to build your polite sentence:</div>
+            <div class="word-options" id="word-options"></div>
+
+            <div id="feedback-msg"></div>
+
+            <div class="modal-actions">
+                <div class="flex gap-2">
+                    <button class="btn btn-secondary" id="clear-btn">Clear</button>
+                    <button class="btn btn-warning" id="hint-btn">Hint</button>
+                </div>
+                <button class="btn btn-primary" id="submit-btn">Submit Answer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Victory Modal -->
+    <div class="modal" id="victory-modal" style="display: none;">
+        <div class="modal-content text-center items-center">
+            <div class="text-5xl mb-2">🏆</div>
+            <h2 class="text-2xl font-bold text-emerald-600 mb-1">Fantastic Job, <span id="victory-player-name">Student</span>!</h2>
+            <p class="text-slate-600 text-sm mb-4">You have successfully mastered polite greetings around the school hallways and classrooms!</p>
+            <div class="bg-emerald-100 border border-emerald-300 text-emerald-800 p-3 rounded-xl font-bold text-sm w-full mb-4">
+                Badge Earned: Manner Master Champion 🎖️
+            </div>
+            <button class="btn btn-primary w-full py-3" onclick="location.reload()">Play Again</button>
+        </div>
+    </div>
+
+    <!-- Firebase SDK Modules -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, updateDoc, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        window.playerName = "";
+        window.playerDocRef = null;
+        window.startTime = null;
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'polite-student-3d';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+
+        let db = null;
+        let auth = null;
+
+        if (firebaseConfig) {
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (e) {
+                console.warn("Cloud persistence setup skipped or failed:", e);
+            }
+        }
+
+        window.recordPlayerStart = async function(name) {
+            window.playerName = name;
+            window.startTime = Date.now();
+
+            if (!db || !auth || !auth.currentUser) return;
+
+            try {
+                const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'player_sessions');
+                const docRef = await addDoc(colRef, {
+                    playerName: name,
+                    uid: auth.currentUser.uid,
+                    startTime: serverTimestamp(),
+                    status: 'started',
+                    completedCount: 0
+                });
+                window.playerDocRef = docRef;
+            } catch (err) {
+                console.warn("Could not record player start:", err);
+            }
+        };
+
+        window.recordPlayerVictory = async function() {
+            if (!db || !window.playerDocRef) return;
+
+            const timeTakenSec = Math.floor((Date.now() - (window.startTime || Date.now())) / 1000);
+
+            try {
+                await updateDoc(window.playerDocRef, {
+                    status: 'completed',
+                    completedCount: 5,
+                    completedAt: serverTimestamp(),
+                    timeTakenSeconds: timeTakenSec
+                });
+            } catch (err) {
+                console.warn("Could not record player completion:", err);
+            }
+        };
+    </script>
+
+    <script>
+        // --- GAME STATE ---
+        let gameStarted = false;
+
+        // --- NPC & QUEST DATA ---
+        const npcData = [
+            {
+                id: 0,
+                name: "Teacher Sarah",
+                role: "Class Teacher",
+                avatar: "👩‍🏫",
+                color: 0x3182CE,
+                position: { x: -14, z: 12 },
+                scenario: "You meet your class teacher inside Classroom 1 in the morning.",
+                targetSentence: ["Good", "morning", "teacher,", "how", "are", "you", "today?"],
+                scrambled: ["how", "teacher,", "Good", "today?", "are", "morning", "you"],
+                completed: false
+            },
+            {
+                id: 1,
+                name: "Adam",
+                role: "Best Friend",
+                avatar: "👦",
+                color: 0xDD6B20,
+                position: { x: 14, z: 12 },
+                scenario: "Ask your friend Adam if he wants to join you for lunch at the Canteen.",
+                targetSentence: ["Hi", "Adam,", "would", "you", "like", "to", "eat", "lunch", "together?"],
+                scrambled: ["like", "lunch", "Adam,", "would", "together?", "Hi", "to", "eat", "you"],
+                completed: false
+            },
+            {
+                id: 2,
+                name: "Uncle Muthu",
+                role: "School Gardener",
+                avatar: "👨‍🌾",
+                color: 0x38A169,
+                position: { x: -14, z: -12 },
+                scenario: "Compliment Uncle Muthu near the Courtyard Garden for keeping flowers radiant.",
+                targetSentence: ["Hello", "Uncle", "Muthu,", "you", "have", "made", "our", "garden", "beautiful!"],
+                scrambled: ["made", "Muthu,", "beautiful!", "Hello", "our", "you", "Uncle", "garden", "have"],
+                completed: false
+            },
+            {
+                id: 3,
+                name: "Auntie Ros",
+                role: "School Cleaner",
+                avatar: "👩‍💼",
+                color: 0x805AD5,
+                position: { x: 0, z: 0 },
+                scenario: "Express gratitude to Auntie Ros for keeping the central hallway shining clean.",
+                targetSentence: ["Thank", "you", "Auntie", "Ros", "for", "keeping", "our", "school", "clean!"],
+                scrambled: ["Ros", "keeping", "Thank", "clean!", "for", "our", "you", "Auntie", "school"],
+                completed: false
+            },
+            {
+                id: 4,
+                name: "Mr. David",
+                role: "Headmaster",
+                avatar: "👨‍🏫",
+                color: 0xE53E3E,
+                position: { x: 14, z: -12 },
+                scenario: "Ask permission politely from Mr. David inside the Principal's Office.",
+                targetSentence: ["Excuse", "me", "Mr", "David,", "may", "I", "please", "come", "in?"],
+                scrambled: ["may", "me", "David,", "in?", "Excuse", "please", "Mr", "come", "I"],
+                completed: false
+            }
+        ];
+
+        let currentActiveNPC = null;
+        let selectedWords = [];
+        let completedCount = 0;
+        let isDialogOpen = false;
+
+        // --- START GAME HANDLER ---
+        document.getElementById('play-btn').addEventListener('click', () => {
+            const input = document.getElementById('player-name-input');
+            const err = document.getElementById('start-error');
+            const name = input.value.trim();
+
+            if (!name) {
+                err.classList.remove('hidden');
+                return;
+            }
+
+            err.classList.add('hidden');
+            document.getElementById('start-modal').style.display = 'none';
+            document.getElementById('ui-layer').style.display = 'flex';
+            document.getElementById('player-display-name').textContent = `Player: ${name}`;
+
+            if (window.recordPlayerStart) {
+                window.recordPlayerStart(name);
+            }
+
+            gameStarted = true;
+        });
+
+        // --- THREE.JS ENGINE SETUP ---
+        const container = document.getElementById('game-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x718096);
+        scene.fog = new THREE.FogExp2(0x718096, 0.015);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        // --- LIGHTING ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xfffaed, 0.7);
+        sunLight.position.set(25, 35, 20);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        const d = 35;
+        sunLight.shadow.camera.left = -d;
+        sunLight.shadow.camera.right = d;
+        sunLight.shadow.camera.top = d;
+        sunLight.shadow.camera.bottom = -d;
+        scene.add(sunLight);
+
+        // Interior Classroom Lights
+        function createRoomLight(x, y, z, color = 0xFFF5EA, intensity = 0.8) {
+            const pLight = new THREE.PointLight(color, intensity, 14);
+            pLight.position.set(x, y, z);
+            scene.add(pLight);
+        }
+        createRoomLight(-14, 4, 12); // Classroom 1
+        createRoomLight(14, 4, 12);  // Canteen
+        createRoomLight(-14, 4, -12); // Courtyard
+        createRoomLight(14, 4, -12);  // Office
+        createRoomLight(0, 4, 0);     // Main Hallway
+
+        // --- SCHOOL ARCHITECTURE BUILDING ---
+        const colliders = [];
+        const floorGeo = new THREE.PlaneGeometry(50, 50);
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0xE2E8F0, roughness: 0.3 });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        scene.add(floor);
+
+        function createWall(x, z, w, h, d, color = 0xFFFFFF) {
+            const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.5 });
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+            mesh.position.set(x, h / 2, z);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            scene.add(mesh);
+
+            const box = new THREE.Box3().setFromObject(mesh);
+            colliders.push(box);
+            return mesh;
+        }
+
+        // Outer School Bounds
+        createWall(0, -25, 50, 4, 1, 0x4A5568);
+        createWall(0, 25, 50, 4, 1, 0x4A5568);
+        createWall(-25, 0, 1, 4, 50, 0x4A5568);
+        createWall(25, 0, 1, 4, 50, 0x4A5568);
+
+        // Main Corridor & Room Partition Walls (With Door Openings)
+        // Horizontal Hallway Dividers
+        createWall(-16, 5, 18, 3.5, 0.8, 0xEDF2F7);
+        createWall(16, 5, 18, 3.5, 0.8, 0xEDF2F7);
+        createWall(-16, -5, 18, 3.5, 0.8, 0xEDF2F7);
+        createWall(16, -5, 18, 3.5, 0.8, 0xEDF2F7);
+
+        // Vertical Room Wall Dividers
+        createWall(-5, 15, 0.8, 3.5, 18, 0xCBD5E0);
+        createWall(5, 15, 0.8, 3.5, 18, 0xCBD5E0);
+        createWall(-5, -15, 0.8, 3.5, 18, 0xCBD5E0);
+        createWall(5, -15, 0.8, 3.5, 18, 0xCBD5E0);
+
+        // --- INTERIOR DECORATIONS & FURNITURE ---
+        function createBlackboard(x, z, ry) {
+            const board = new THREE.Mesh(new THREE.BoxGeometry(4, 2, 0.1), new THREE.MeshStandardMaterial({ color: 0x1A202C }));
+            board.position.set(x, 2, z);
+            board.rotation.y = ry;
+            scene.add(board);
+        }
+        createBlackboard(-14, 24.4, 0); // Classroom 1 Blackboard
+        createBlackboard(14, -24.4, 0); // Headmaster Office Wall
+
+        function createDesk(x, z) {
+            const deskTop = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.1, 1.0), new THREE.MeshStandardMaterial({ color: 0xC05621 }));
+            deskTop.position.set(x, 0.8, z);
+            deskTop.castShadow = true;
+            scene.add(deskTop);
+
+            const legGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.8);
+            const legMat = new THREE.MeshStandardMaterial({ color: 0x2D3748 });
+            [[-0.7, -0.4], [0.7, -0.4], [-0.7, 0.4], [0.7, 0.4]].forEach(offset => {
+                const leg = new THREE.Mesh(legGeo, legMat);
+                leg.position.set(x + offset[0], 0.4, z + offset[1]);
+                scene.add(leg);
+            });
+        }
+        // Classroom Desks
+        createDesk(-16, 15); createDesk(-12, 15); createDesk(-16, 10); createDesk(-12, 10);
+        // Office Desk & Canteen Tables
+        createDesk(14, -14); createDesk(12, 12); createDesk(16, 12);
+
+        // --- PLAYER SETUP ---
+        const playerGroup = new THREE.Group();
+        const bodyGeo = new THREE.CylinderGeometry(0.4, 0.4, 1.4, 16);
+        const bodyMat = new THREE.MeshLambertMaterial({ color: 0x3182CE });
+        const body = new THREE.Mesh(bodyGeo, bodyMat);
+        body.position.y = 0.7;
+        body.castShadow = true;
+        playerGroup.add(body);
+
+        const headGeo = new THREE.SphereGeometry(0.35, 16, 16);
+        const headMat = new THREE.MeshLambertMaterial({ color: 0xFBD38D });
+        const head = new THREE.Mesh(headGeo, headMat);
+        head.position.y = 1.6;
+        head.castShadow = true;
+        playerGroup.add(head);
+
+        playerGroup.position.set(0, 0, 20);
+        scene.add(playerGroup);
+
+        // --- NPC SETUP ---
+        const npcMeshes = [];
+        npcData.forEach(data => {
+            const group = new THREE.Group();
+            const nBody = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.
